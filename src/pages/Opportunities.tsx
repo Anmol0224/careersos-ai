@@ -103,7 +103,7 @@ export const Opportunities: React.FC = () => {
   return (
     <PageContainer
       title="Opportunities for You"
-      subtitle="17 opportunities found matching your verified skill readiness profile."
+      subtitle={`${filteredOpportunities.length} opportunities found matching your verified skill readiness profile.`}
       questionBadge="Where can I apply?"
       actions={
         <div className="text-xs font-semibold text-[#2563EB] bg-[#EFF6FF] px-3 py-1.5 rounded-lg border border-blue-200">
@@ -214,7 +214,7 @@ export const Opportunities: React.FC = () => {
       {filteredOpportunities.length === 0 && (
         <div className="text-center py-16 bg-white border border-[#E2E8F0] rounded-xl">
           <p className="text-sm font-semibold text-[#0F172A]">No opportunities match your filter.</p>
-          <p className="text-xs text-[#94A3B8] mt-1">Try resetting filters to view all 17 opportunities.</p>
+          <p className="text-xs text-[#94A3B8] mt-1">Try resetting filters to view all {allOpportunities.length} opportunities.</p>
         </div>
       )}
 

@@ -10,6 +10,9 @@ import { useNavigate } from 'react-router-dom';
 
 export const Roadmap: React.FC = () => {
   const navigate = useNavigate();
+  const completeSteps = mockRoadmapSteps.filter((s) => s.status === 'Complete').length;
+  const totalSteps = mockRoadmapSteps.length;
+  const completionPct = Math.round((completeSteps / totalSteps) * 100);
 
   return (
     <PageContainer
@@ -36,19 +39,19 @@ export const Roadmap: React.FC = () => {
                 Target Role: Data Analyst
               </span>
               <h3 className="text-xl font-bold text-[#0F172A]">
-                6 / 14 steps complete
+                {completeSteps} / {totalSteps} steps complete
               </h3>
               <p className="text-xs text-[#475569]">
-                43% overall progress toward certified full readiness.
+                {completionPct}% overall progress toward certified full readiness.
               </p>
             </div>
 
             <div className="w-full sm:w-64 space-y-1.5">
               <div className="flex justify-between text-xs font-semibold">
                 <span className="text-[#475569]">Completion</span>
-                <span className="text-[#2563EB]">43%</span>
+                <span className="text-[#2563EB]">{completionPct}%</span>
               </div>
-              <ProgressBar value={43} height="md" variant="blue" />
+              <ProgressBar value={completionPct} height="md" variant="blue" />
             </div>
           </div>
 

@@ -6,7 +6,7 @@ import { SkillsOverviewCard } from '../components/dashboard/SkillsOverviewCard';
 import { ProgressHistoryCard } from '../components/dashboard/ProgressHistoryCard';
 import { OpportunitiesSnippet } from '../components/dashboard/OpportunitiesSnippet';
 import { OpportunityModal } from '../components/opportunities/OpportunityModal';
-import { mockUserProfile } from '../data/mockData';
+import { mockUserProfile, mockProgressMetrics } from '../data/mockData';
 import type { OpportunityItem } from '../data/mockData';
 import { Button } from '../components/ui/Button';
 import { Compass, ArrowRight } from 'lucide-react';
@@ -45,7 +45,7 @@ export const Dashboard: React.FC = () => {
       {/* 1. Primary Career Readiness Card */}
       <ReadinessCard
         score={mockUserProfile.readinessScore}
-        monthlyGain={5}
+        monthlyGain={mockProgressMetrics[0].delta}
         targetCareer={mockUserProfile.targetCareer}
         alignment={mockUserProfile.alignmentRate}
         coreReady={mockUserProfile.coreSkillsReady}

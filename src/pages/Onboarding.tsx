@@ -17,6 +17,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { aiService } from '../services/ai';
+import { mockUserProfile } from '../data/mockData';
 
 export const Onboarding: React.FC = () => {
   const navigate = useNavigate();
@@ -25,14 +26,14 @@ export const Onboarding: React.FC = () => {
 
   // Form State
   const [aboutData, setAboutData] = useState({
-    fullName: 'Rahul Sharma',
-    email: 'rahul.sharma@example.com',
-    location: 'Indore, MP',
+    fullName: mockUserProfile.name,
+    email: mockUserProfile.email,
+    location: mockUserProfile.location,
   });
 
   const [educationData, setEducationData] = useState({
-    degree: 'B.Tech in Computer Science',
-    institution: 'Medicaps University',
+    degree: mockUserProfile.degree,
+    institution: mockUserProfile.institution,
     gradYear: '2026',
     gpa: '8.4 / 10',
   });

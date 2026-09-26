@@ -14,6 +14,8 @@ export const Career: React.FC = () => {
 
   const priorityGap = mockPriorityGaps[0]; // Power BI
   const secondaryGaps = mockPriorityGaps.slice(1);
+  const readySkillsCount = mockSkills.filter((s) => s.status === 'Ready').length;
+  const totalSkillsCount = mockSkills.length;
 
   return (
     <PageContainer
@@ -47,7 +49,7 @@ export const Career: React.FC = () => {
                 <div className="flex items-center gap-3 text-xs text-[#475569] mt-1">
                   <span className="text-emerald-700 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    3 of 6 core skills verified Ready
+                    {readySkillsCount} of {totalSkillsCount} core skills verified Ready
                   </span>
                   <span>·</span>
                   <span className="text-red-700 font-semibold flex items-center gap-1">

@@ -3,10 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Sparkles, ArrowRight, ShieldCheck, Target } from 'lucide-react';
+import { mockUserProfile } from '../data/mockData';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('rahul.sharma@example.com');
+  const [email, setEmail] = useState(mockUserProfile.email);
   const [password, setPassword] = useState('password123');
   const [isLoading, setIsLoading] = useState(false);
 
