@@ -17,6 +17,7 @@ import {
 import { cn } from '../../lib/utils';
 import { mockUserProfile } from '../../data/mockData';
 import { Avatar } from '../ui/Avatar';
+import { useAuth } from '../../context/AuthContext';
 
 export interface SidebarProps {
   isOpen?: boolean;
@@ -26,6 +27,7 @@ export interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, className }) => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const mainNav = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -42,9 +44,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, className }) 
     { label: 'Help', path: '#help', icon: HelpCircle, isModal: true },
   ];
 
-  const handleLogout = () => {
-    navigate('/login');
-  };
+const handleLogout = async () => {
+  await signOut();
+  navigate('/login', { replace: true });
+};
 
   return (
     <>
