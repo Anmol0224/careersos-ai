@@ -3,30 +3,53 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Sparkles, ArrowRight, ShieldCheck, Target } from 'lucide-react';
-import { mockUserProfile } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState(mockUserProfile.email);
-  const [password, setPassword] = useState('password123');
+const [email, setEmail] = useState('');
+const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignIn = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate('/dashboard');
-    }, 600);
-  };
+const handleSignIn = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-  const handleDemoAccount = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate('/dashboard');
-    }, 400);
-  };
+  setIsLoading(true);
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  setIsLoading(false);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  navigate('/dashboard', { replace: true });
+};
+
+const handleDemoAccount = async () => {
+  setIsLoading(true);
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: 'demo@careeros.ai',
+    password: 'CareerOS@2026!',
+  });
+
+  setIsLoading(false);
+
+  if (error) {
+    alert(
+      'Demo login failed. Please check the demo account in Supabase.'
+    );
+    return;
+  }
+
+  navigate('/dashboard', { replace: true });
+};
 
   return (
     <div className="min-h-screen flex bg-white text-[#0F172A]">
