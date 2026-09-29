@@ -6,7 +6,7 @@ export type SaveProfileInput = {
   degree: string
   institution: string
   graduationYear: number | null
-  gpa: string 
+  gpa: string
   careerGoal: string
   interests: string[]
 }
@@ -34,8 +34,9 @@ export const profileService = {
           full_name: input.fullName,
           city: input.city,
           degree: input.degree,
-          branch: input.institution,
+          institution: input.institution,
           graduation_year: input.graduationYear,
+          gpa: input.gpa,
           career_goal: input.careerGoal,
           interests: input.interests,
           preferred_language: 'English',

@@ -192,7 +192,10 @@ const handleDemoAccount = async () => {
           {/* Create Account link */}
           <div className="text-center pt-2 text-xs text-[#475569]">
             Don't have an account yet?{' '}
-            <Link to="/onboarding" className="font-bold text-[#2563EB] hover:underline">
+            <Link
+              to="/signup"
+              className="font-bold text-[#2563EB] hover:underline"
+            >
               Create an account
             </Link>
           </div>

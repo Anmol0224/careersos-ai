@@ -11,6 +11,7 @@ import { Opportunities } from './pages/Opportunities'
 import { Profile } from './pages/Profile'
 import { AppLayout } from './components/layout/AppLayout'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { Signup } from './pages/Signup'
 
 export function App() {
   return (
@@ -18,9 +19,10 @@ export function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/signup" element={<Signup />} />
 
         <Route element={<ProtectedRoute />}>
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/career" element={<Career />} />
