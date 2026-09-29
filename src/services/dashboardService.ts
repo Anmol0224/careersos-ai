@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { readinessService } from './readinessService'
 
 export type DashboardSkill = {
     id: string
@@ -6,7 +7,8 @@ export type DashboardSkill = {
     currentScore: number
     requiredScore: number
     gap: number
-    status: 'Ready' | 'Developing' | 'Needs Work'
+    status: 'Ready' | 'Developing' | 'Needs Work' | 'Not Assessed'
+    isUnassessed: boolean
 }
 
 export type DashboardData = {
@@ -23,6 +25,7 @@ export type DashboardData = {
         currentScore: number
         previousScore: number | null
         delta: number
+        hasAssessedSkills: boolean
     }
 
     career: {
@@ -67,11 +70,10 @@ type SkillRow = {
 type UserSkillRow = {
     skill_id: string
     current_score: number | string
-}
-
-type ReadinessRow = {
-    score: number
-    created_at: string
+    source: string | null
+    evidence_notes: string | null
+    last_assessed_at: string | null
+    evidence_status: string
 }
 
 const getSkillStatus = (
@@ -91,26 +93,11 @@ const getSkillStatus = (
 
 export const dashboardService = {
     async getDashboardData(userId: string): Promise<DashboardData> {
-        const [
-            { data: profile, error: profileError },
-            { data: readinessRows, error: readinessError },
-        ] = await Promise.all([
-            supabase
-                .from('profiles')
-                .select(
-                    'full_name, career_goal, city, institution, degree, gpa'
-                )
-                .eq('id', userId)
-                .maybeSingle<ProfileRow>(),
-
-            supabase
-                .from('readiness_scores')
-                .select('score, created_at')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(2)
-                .returns<ReadinessRow[]>(),
-        ])
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('full_name, career_goal, city, institution, degree, gpa')
+            .eq('id', userId)
+            .maybeSingle<ProfileRow>()
 
         if (profileError) {
             throw new Error(
@@ -118,11 +105,7 @@ export const dashboardService = {
             )
         }
 
-        if (readinessError) {
-            throw new Error(
-                `Failed to load readiness history: ${readinessError.message}`,
-            )
-        }
+
 
         const careerGoal = profile?.career_goal?.trim() || 'Data Analyst'
 
@@ -226,7 +209,7 @@ export const dashboardService = {
 
             supabase
                 .from('user_skills')
-                .select('skill_id, current_score')
+                .select('skill_id, current_score, source, evidence_notes, last_assessed_at, evidence_status')
                 .eq('user_id', userId)
                 .in('skill_id', skillIds)
                 .returns<UserSkillRow[]>(),
@@ -251,10 +234,10 @@ export const dashboardService = {
             ]),
         )
 
-        const userScoreMap = new Map(
+        const userSkillMap = new Map(
             (userSkills ?? []).map((skill) => [
                 skill.skill_id,
-                Number(skill.current_score),
+                skill,
             ]),
         )
 
@@ -268,17 +251,19 @@ export const dashboardService = {
                     return null
                 }
 
-                const currentScore =
-                    userScoreMap.get(careerSkill.skill_id) ?? 0
-
-                const requiredScore = Number(
-                    careerSkill.required_score,
+                const userSkill = userSkillMap.get(careerSkill.skill_id)
+                const isUnassessed = !userSkill || (
+                    userSkill.source === 'onboarding' &&
+                    Number(userSkill.current_score) === 0 &&
+                    !userSkill.last_assessed_at &&
+                    !userSkill.evidence_notes
                 )
 
-                const gap = Math.max(
-                    requiredScore - currentScore,
-                    0,
-                )
+                const currentScore = userSkill ? Number(userSkill.current_score) : 0
+                const requiredScore = Number(careerSkill.required_score)
+                const gap = Math.max(requiredScore - currentScore, 0)
+
+                const status = isUnassessed ? 'Not Assessed' : getSkillStatus(currentScore, requiredScore)
 
                 return {
                     id: careerSkill.skill_id,
@@ -286,10 +271,8 @@ export const dashboardService = {
                     currentScore,
                     requiredScore,
                     gap,
-                    status: getSkillStatus(
-                        currentScore,
-                        requiredScore,
-                    ),
+                    status,
+                    isUnassessed
                 }
             })
             .filter(
@@ -304,40 +287,17 @@ export const dashboardService = {
 
         const coreTotal = dashboardSkills.length
 
-        const alignment =
-            coreTotal > 0
-                ? Math.round(
-                    (dashboardSkills.reduce(
-                        (total, skill) =>
-                            total +
-                            Math.min(
-                                skill.currentScore /
-                                Math.max(skill.requiredScore, 1),
-                                1,
-                            ),
-                        0,
-                    ) /
-                        coreTotal) *
-                    100,
-                )
-                : 0
+        const readinessResult = await readinessService.calculateAndSaveReadiness(userId)
 
-        const currentReadiness =
-            readinessRows?.[0]?.score ?? alignment
+        const alignment = readinessResult.components.roleSkills.score !== null
+            ? Math.round(readinessResult.components.roleSkills.score)
+            : 0
 
-        const previousReadiness =
-            readinessRows?.[1]?.score ?? null
 
-        const delta =
-            previousReadiness !== null
-                ? currentReadiness - previousReadiness
-                : 0
 
         const topSkills = [...dashboardSkills]
-            .sort(
-                (a, b) =>
-                    b.currentScore - a.currentScore,
-            )
+            .filter((skill) => !skill.isUnassessed)
+            .sort((a, b) => b.currentScore - a.currentScore)
             .slice(0, 3)
 
         const priorityGaps = [...dashboardSkills]
@@ -364,9 +324,10 @@ export const dashboardService = {
             },
 
             readiness: {
-                currentScore: currentReadiness,
-                previousScore: previousReadiness,
-                delta,
+                currentScore: readinessResult.score,
+                previousScore: readinessResult.previousScore,
+                delta: readinessResult.delta,
+                hasAssessedSkills: dashboardSkills.some(s => !s.isUnassessed)
             },
 
             career: {

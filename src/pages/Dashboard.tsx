@@ -192,11 +192,16 @@ export const Dashboard: React.FC = () => {
         coreTotal={
           dashboardData.career.coreTotal
         }
+        hasAssessedSkills={
+          dashboardData.readiness.hasAssessedSkills
+        }
       />
 
       <NextActionCard
         title={
-          topGap
+          !dashboardData.readiness.hasAssessedSkills
+            ? `Complete your baseline assessment`
+            : topGap
             ? `Improve your ${topGap.name} skill`
             : `Continue your ${dashboardData.career.title} roadmap`
         }
@@ -204,7 +209,9 @@ export const Dashboard: React.FC = () => {
         difficulty="Intermediate"
         impact="High Impact"
         description={
-          topGap
+          !dashboardData.readiness.hasAssessedSkills
+            ? `Complete your initial assessment to establish your current ${dashboardData.career.title} skill levels.`
+            : topGap
             ? `${topGap.name} is currently your highest-priority skill gap for the ${dashboardData.career.title} role.`
             : 'Continue building practical evidence for your target career.'
         }

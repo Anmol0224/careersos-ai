@@ -21,17 +21,11 @@ export const SkillsOverviewCard: React.FC<
   topSkills,
   priorityGaps,
 }) => {
-  const strongestStatus =
-    topSkills.length > 0 &&
-    topSkills.every(
-      (skill) => skill.currentScore >= skill.requiredScore,
-    )
+  const strongestStatus = topSkills.length === 0
+    ? 'Not Assessed'
+    : topSkills.every((skill) => skill.currentScore >= skill.requiredScore)
       ? 'Ready'
-      : topSkills.some(
-            (skill) =>
-              skill.currentScore >=
-              skill.requiredScore * 0.8,
-          )
+      : topSkills.some((skill) => skill.currentScore >= skill.requiredScore * 0.8)
         ? 'Developing'
         : 'Needs Work'
 
@@ -68,7 +62,7 @@ export const SkillsOverviewCard: React.FC<
           {topSkills.length === 0 ? (
             <div className="rounded-lg border border-[#E2E8F0] bg-slate-50 p-4">
               <p className="text-sm text-[#475569]">
-                Your skills have not been assessed yet.
+                Skills not assessed yet. Complete an assessment or provide evidence to establish your current skill levels.
               </p>
             </div>
           ) : (
@@ -135,13 +129,17 @@ export const SkillsOverviewCard: React.FC<
             </div>
           ) : (
             priorityGaps.map((gap) => {
-              const actionRoute =
-                gap.gap >= 20
+              const isUnassessed = gap.status === 'Not Assessed'
+
+              const actionRoute = isUnassessed
+                ? '/challenge'
+                : gap.gap >= 20
                   ? '/challenge'
                   : '/roadmap'
 
-              const recommendation =
-                gap.gap >= 20
+              const recommendation = isUnassessed
+                ? `Establish your baseline for ${gap.name}.`
+                : gap.gap >= 20
                   ? `Build practical ${gap.name} skills through a focused challenge.`
                   : `Strengthen ${gap.name} through targeted roadmap practice.`
 
@@ -181,7 +179,9 @@ export const SkillsOverviewCard: React.FC<
                     variant={
                       gap.status === 'Needs Work'
                         ? 'error'
-                        : 'warning'
+                        : gap.status === 'Not Assessed'
+                          ? 'navy'
+                          : 'warning'
                     }
                   />
 

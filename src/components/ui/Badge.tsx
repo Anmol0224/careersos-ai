@@ -45,7 +45,7 @@ export const Badge: React.FC<BadgeProps> = ({
 };
 
 export interface StatusBadgeProps {
-  status: 'Ready' | 'Developing' | 'Needs Work';
+  status: 'Ready' | 'Developing' | 'Needs Work' | 'Not Assessed';
   size?: 'sm' | 'md';
   className?: string;
 }
@@ -75,6 +75,13 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         <Badge variant="error" size={size} className={className}>
           <AlertTriangle className="w-3 h-3 text-red-600 stroke-[2.5]" />
           <span>Needs Work</span>
+        </Badge>
+      );
+    case 'Not Assessed':
+      return (
+        <Badge variant="default" size={size} className={className}>
+          <AlertCircle className="w-3 h-3 text-slate-500 stroke-[2.5]" />
+          <span>Not Assessed</span>
         </Badge>
       );
   }

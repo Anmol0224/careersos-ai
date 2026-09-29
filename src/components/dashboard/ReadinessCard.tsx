@@ -11,6 +11,7 @@ export interface ReadinessCardProps {
   alignment: number;
   coreReady: number;
   coreTotal: number;
+  hasAssessedSkills: boolean;
 }
 
 export const ReadinessCard: React.FC<ReadinessCardProps> = ({
@@ -20,6 +21,7 @@ export const ReadinessCard: React.FC<ReadinessCardProps> = ({
   alignment,
   coreReady,
   coreTotal,
+  hasAssessedSkills,
 }) => {
   return (
     <Card className="bg-white border-[#E2E8F0]">
@@ -63,11 +65,13 @@ export const ReadinessCard: React.FC<ReadinessCardProps> = ({
             {/* Profile Alignment */}
             <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-left">
               <div className="flex items-center gap-1.5 text-[#94A3B8] text-xs font-medium mb-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                {hasAssessedSkills ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Target className="w-3.5 h-3.5 text-slate-400" />}
                 <span>Alignment</span>
               </div>
-              <div className="font-bold text-sm text-[#0F172A]">{alignment}%</div>
-              <span className="text-[11px] text-emerald-600 font-medium">High Fit</span>
+              <div className="font-bold text-sm text-[#0F172A]">{hasAssessedSkills ? `${alignment}%` : '--'}</div>
+              <span className={`text-[11px] font-medium ${hasAssessedSkills ? 'text-emerald-600' : 'text-slate-500'}`}>
+                {hasAssessedSkills ? 'High Fit' : 'Not Assessed'}
+              </span>
             </div>
 
             {/* Core Skills Ready */}
