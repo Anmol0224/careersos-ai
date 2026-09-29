@@ -378,20 +378,26 @@ export const careerService = {
     if (!career) throw new Error(`Career "${careerGoal}" not found.`)
 
     // 2. Check for existing roadmap (idempotent)
-    const { data: existing, error: existingError } = await supabase
+    const { data: existingRoadmaps, error: existingError } = await supabase
       .from('roadmaps')
       .select('id, career_id, title, status')
       .eq('user_id', userId)
       .eq('career_id', career.id)
-      .maybeSingle()
+      .order('created_at', { ascending: false })
+      .limit(1)
 
     if (existingError) {
       throw new Error(`Failed to check roadmap: ${existingError.message}`)
     }
 
+    const existing = existingRoadmaps?.[0] || null
+
     let roadmapId: string
 
     if (existing) {
+      if (existingRoadmaps && existingRoadmaps.length > 1) {
+        console.warn('Multiple roadmaps detected. Using the most recent one.')
+      }
       roadmapId = existing.id
     } else {
       // 3. No roadmap yet — find highest-priority gap to seed it
