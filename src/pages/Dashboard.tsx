@@ -211,7 +211,10 @@ export const Dashboard: React.FC = () => {
         actionRoute="/challenge"
       />
 
-      <SkillsOverviewCard />
+      <SkillsOverviewCard
+        topSkills={dashboardData.topSkills}
+        priorityGaps={dashboardData.priorityGaps}
+      />
 
       <ProgressHistoryCard />
 
