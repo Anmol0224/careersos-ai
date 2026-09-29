@@ -174,7 +174,46 @@ export const dashboardService = {
                 `No skills are configured for ${career.name}.`,
             )
         }
+        const { data: existingUserSkills, error: existingUserSkillsError } =
+            await supabase
+                .from('user_skills')
+                .select('skill_id')
+                .eq('user_id', userId)
+                .in('skill_id', skillIds)
 
+        if (existingUserSkillsError) {
+            throw new Error(
+                `Failed to check your skill records: ${existingUserSkillsError.message}`,
+            )
+        }
+
+        const existingSkillIds = new Set(
+            (existingUserSkills ?? []).map((skill) => skill.skill_id),
+        )
+
+        const missingSkillIds = skillIds.filter(
+            (skillId) => !existingSkillIds.has(skillId),
+        )
+
+        if (missingSkillIds.length > 0) {
+            const newSkillRecords = missingSkillIds.map((skillId) => ({
+                user_id: userId,
+                skill_id: skillId,
+                current_score: 0,
+                evidence_status: 'needs_work',
+                source: 'onboarding',
+            }))
+
+            const { error: insertSkillsError } = await supabase
+                .from('user_skills')
+                .insert(newSkillRecords)
+
+            if (insertSkillsError) {
+                throw new Error(
+                    `Failed to initialize your skill records: ${insertSkillsError.message}`,
+                )
+            }
+        }
         const [
             { data: skills, error: skillsError },
             { data: userSkills, error: userSkillsError },
