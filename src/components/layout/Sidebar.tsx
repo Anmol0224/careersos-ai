@@ -15,17 +15,18 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { mockUserProfile } from '../../data/mockData';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../context/AuthContext';
+import type { ShellProfile } from '../../hooks/useShellProfile';
 
 export interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   className?: string;
+  shellProfile: ShellProfile | null;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, className }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, className, shellProfile }) => {
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
@@ -48,6 +49,11 @@ const handleLogout = async () => {
   await signOut();
   navigate('/login', { replace: true });
 };
+
+  const displayName = shellProfile?.fullName ?? '…';
+  const displayCareer = shellProfile?.careerGoal || '—';
+  const displayInstitution = shellProfile?.institution || '';
+  const displayReadiness = shellProfile?.readinessScore;
 
   return (
     <>
@@ -96,9 +102,11 @@ const handleLogout = async () => {
           <div className="p-3 bg-[#EFF6FF] border border-blue-100 rounded-lg">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-[#2563EB] block">Target Career</span>
             <div className="flex items-center justify-between mt-0.5">
-              <span className="text-xs font-bold text-[#14213D]">{mockUserProfile.targetCareer}</span>
+              <span className="text-xs font-bold text-[#14213D]">{displayCareer}</span>
               <span className="text-xs font-semibold text-[#2563EB] bg-white px-1.5 py-0.5 rounded shadow-2xs">
-                {mockUserProfile.readinessScore}% Ready
+                {displayReadiness !== null && displayReadiness !== undefined
+                  ? `${displayReadiness}% Ready`
+                  : 'Not assessed'}
               </span>
             </div>
           </div>
@@ -177,10 +185,10 @@ const handleLogout = async () => {
             onClick={onClose}
             className="flex items-center gap-3 p-2 rounded-lg hover:bg-white transition-colors"
           >
-            <Avatar name={mockUserProfile.name} size="sm" />
+            <Avatar name={displayName} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-[#0F172A] truncate">{mockUserProfile.name}</p>
-              <p className="text-[11px] text-[#475569] truncate">{mockUserProfile.institution}</p>
+              <p className="text-xs font-bold text-[#0F172A] truncate">{displayName}</p>
+              <p className="text-[11px] text-[#475569] truncate">{displayInstitution}</p>
             </div>
           </NavLink>
         </div>

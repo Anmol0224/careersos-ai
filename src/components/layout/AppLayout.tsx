@@ -6,12 +6,15 @@ import { AskCareerOSModal } from '../dashboard/AskCareerOSModal';
 import { Sparkles } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { useShellProfile } from '../../hooks/useShellProfile';
 
 export const AppLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [askCareerOSOpen, setAskCareerOSOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  const { profile } = useShellProfile();
 
   const settingsOpen = location.hash === '#settings';
   const helpOpen = location.hash === '#help';
@@ -26,6 +29,7 @@ export const AppLayout: React.FC = () => {
       <Sidebar
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
+        shellProfile={profile}
       />
 
       {/* Main Container */}
@@ -34,6 +38,7 @@ export const AppLayout: React.FC = () => {
         <Header
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
           onOpenAskCareerOS={() => setAskCareerOSOpen(true)}
+          shellProfile={profile}
         />
 
         {/* Page Content */}
@@ -72,7 +77,7 @@ export const AppLayout: React.FC = () => {
         <div className="space-y-4 text-sm text-[#475569]">
           <div className="p-3 bg-slate-50 border border-[#E2E8F0] rounded-lg">
             <div className="font-semibold text-[#0F172A] mb-1">Target Role Focus</div>
-            <p className="text-xs">Data Analyst (Industry benchmarks calibrated against top entry-level roles)</p>
+            <p className="text-xs">{profile?.careerGoal || 'Target Role'} (Industry benchmarks calibrated against top entry-level roles)</p>
           </div>
           <div className="p-3 bg-slate-50 border border-[#E2E8F0] rounded-lg">
             <div className="font-semibold text-[#0F172A] mb-1">Notification Cadence</div>

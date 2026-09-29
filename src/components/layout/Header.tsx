@@ -1,19 +1,24 @@
 import React from 'react';
 import { Menu, Search, Bell, Sparkles, Compass } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
-import { mockUserProfile } from '../../data/mockData';
 import { Link, useNavigate } from 'react-router-dom';
+import type { ShellProfile } from '../../hooks/useShellProfile';
 
 export interface HeaderProps {
   onOpenMobileMenu: () => void;
   onOpenAskCareerOS?: () => void;
+  shellProfile: ShellProfile | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenMobileMenu,
   onOpenAskCareerOS,
+  shellProfile,
 }) => {
   const navigate = useNavigate();
+
+  const displayName = shellProfile?.fullName ?? '…';
+  const displayCareer = shellProfile?.careerGoal || '';
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 sm:px-6 flex items-center justify-between">
@@ -80,13 +85,13 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* User Profile */}
         <Link to="/profile" className="flex items-center gap-2 group">
-          <Avatar name={mockUserProfile.name} size="sm" />
+          <Avatar name={displayName} size="sm" />
           <div className="hidden md:block text-left">
             <span className="text-xs font-bold text-[#0F172A] block leading-tight group-hover:text-[#2563EB] transition-colors">
-              {mockUserProfile.name}
+              {displayName}
             </span>
             <span className="text-[10px] text-[#94A3B8] font-medium block">
-              {mockUserProfile.targetCareer}
+              {displayCareer}
             </span>
           </div>
         </Link>
