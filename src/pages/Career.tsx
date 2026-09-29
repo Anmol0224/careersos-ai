@@ -2,41 +2,109 @@ import React, { useEffect, useState } from 'react'
 import { PageContainer } from '../components/layout/PageContainer'
 import { SkillsTable } from '../components/skills/SkillsTable'
 import { GapAnalysisCard } from '../components/skills/GapAnalysisCard'
-import { mockPriorityGaps, mockUserProfile } from '../data/mockData'
-import type { SkillItem } from '../data/mockData'
 import { Card, CardContent } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Target, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Target, ArrowRight, CheckCircle2, AlertTriangle, HelpCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { careerService } from '../services/career'
+import { useAuth } from '../context/AuthContext'
+import {
+  careerService,
+  type CareerGapData,
+} from '../services/careerService'
 
 export const Career: React.FC = () => {
   const navigate = useNavigate()
+  const { user } = useAuth()
 
-  const [skills, setSkills] = useState<SkillItem[]>([])
+  const [gapData, setGapData] = useState<CareerGapData | null>(null)
   const [loading, setLoading] = useState(true)
-
-  const selectedTarget = mockUserProfile.targetCareer
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const loadSkills = async () => {
+    let active = true
+
+    const load = async () => {
+      if (!user) {
+        if (active) {
+          setGapData(null)
+          setLoading(false)
+        }
+        return
+      }
+
       setLoading(true)
-      const data = await careerService.getSkills('data-analyst')
-      setSkills(data)
-      setLoading(false)
+      setError('')
+
+      try {
+        const data = await careerService.getCareerGapData(user.id)
+        if (active) setGapData(data)
+      } catch (err) {
+        if (active)
+          setError(
+            err instanceof Error ? err.message : 'Unable to load career data.',
+          )
+      } finally {
+        if (active) setLoading(false)
+      }
     }
 
-    void loadSkills()
-  }, [])
+    void load()
+    return () => {
+      active = false
+    }
+  }, [user])
 
-  const priorityGap = mockPriorityGaps[0]
-  const secondaryGaps = mockPriorityGaps.slice(1)
+  if (loading) {
+    return (
+      <PageContainer
+        title="Careers & Skill Gap Analysis"
+        subtitle="Benchmark your verified skills against career requirements."
+        questionBadge="What am I missing?"
+      >
+        <Card>
+          <CardContent className="p-6 text-sm text-[#475569]">
+            Loading your career skill gap data...
+          </CardContent>
+        </Card>
+      </PageContainer>
+    )
+  }
 
-  const readySkillsCount = skills.filter(
-    (skill) => skill.status === 'Ready'
+  if (error || !gapData) {
+    return (
+      <PageContainer
+        title="Careers & Skill Gap Analysis"
+        subtitle="Benchmark your verified skills against career requirements."
+        questionBadge="What am I missing?"
+      >
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6">
+            <p className="text-sm font-medium text-red-700">
+              {error || 'Unable to load career data.'}
+            </p>
+            <Button
+              className="mt-4"
+              variant="primary"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </PageContainer>
+    )
+  }
+
+  const { career, skills, priorityGaps, readyCount, totalCount, hasAssessedSkills } = gapData
+
+  const topGap = priorityGaps[0]
+  const secondaryGaps = priorityGaps.slice(1)
+
+  const assessedGapCount = skills.filter(
+    (s) => !s.isUnassessed && s.gap > 0,
   ).length
 
-  const totalSkillsCount = skills.length
+  const unassessedCount = skills.filter((s) => s.isUnassessed).length
 
   return (
     <PageContainer
@@ -44,16 +112,21 @@ export const Career: React.FC = () => {
       subtitle="Benchmark your verified skills against career requirements."
       questionBadge="What am I missing?"
       actions={
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => navigate('/challenge')}
-          rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-        >
-          Work on Power BI
-        </Button>
+        topGap ? (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => navigate('/challenge')}
+            rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+          >
+            {topGap.isUnassessed
+              ? `Assess ${topGap.name}`
+              : `Work on ${topGap.name}`}
+          </Button>
+        ) : undefined
       }
     >
+      {/* Target Career Card */}
       <Card className="bg-white border-[#E2E8F0]">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -68,21 +141,41 @@ export const Career: React.FC = () => {
                 </span>
 
                 <h2 className="text-2xl font-bold text-[#0F172A]">
-                  {selectedTarget}
+                  {career.title}
                 </h2>
 
                 <div className="flex items-center gap-3 text-xs text-[#475569] mt-1">
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {readySkillsCount} of {totalSkillsCount} core skills ready
-                  </span>
+                  {hasAssessedSkills ? (
+                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {readyCount} of {totalCount} core skills ready
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 font-semibold flex items-center gap-1">
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      {totalCount} skills loaded — assessment pending
+                    </span>
+                  )}
 
-                  <span>·</span>
+                  {assessedGapCount > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="text-red-700 font-semibold flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {assessedGapCount} measured gap
+                        {assessedGapCount !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
 
-                  <span className="text-red-700 font-semibold flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    1 Critical Gap (Power BI)
-                  </span>
+                  {unassessedCount > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="text-slate-500 font-semibold">
+                        {unassessedCount} not yet assessed
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -98,27 +191,24 @@ export const Career: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Core Skills Benchmarks */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-[#0F172A]">
               Core Competency Benchmarks
             </h3>
-
             <p className="text-xs text-[#475569]">
               Career requirements loaded from the CareerOS database.
             </p>
           </div>
-
-          <span className="text-xs text-[#94A3B8]">
-            Supabase connected
-          </span>
+          <span className="text-xs text-[#94A3B8]">Supabase connected</span>
         </div>
 
-        {loading ? (
+        {skills.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-sm text-[#475569]">
-              Loading career skills...
+              No skills are configured for {career.title} yet.
             </CardContent>
           </Card>
         ) : (
@@ -126,22 +216,34 @@ export const Career: React.FC = () => {
         )}
       </div>
 
-      <div className="pt-2">
-        <div className="mb-3">
-          <h3 className="text-lg font-bold text-[#0F172A]">
-            Your Biggest Gaps
-          </h3>
+      {/* Priority Gap Analysis */}
+      {priorityGaps.length > 0 && topGap && (
+        <div className="pt-2">
+          <div className="mb-3">
+            <h3 className="text-lg font-bold text-[#0F172A]">
+              Your Biggest Gaps
+            </h3>
+            <p className="text-xs text-[#475569]">
+              Focus on the skills that can produce the biggest readiness
+              improvement.
+            </p>
+          </div>
 
-          <p className="text-xs text-[#475569]">
-            Focus on the skills that can produce the biggest readiness improvement.
-          </p>
+          <GapAnalysisCard
+            priorityGap={topGap}
+            otherGaps={secondaryGaps}
+          />
         </div>
+      )}
 
-        <GapAnalysisCard
-          priorityGap={priorityGap}
-          otherGaps={secondaryGaps}
-        />
-      </div>
+      {priorityGaps.length === 0 && (
+        <Card className="border-emerald-200 bg-emerald-50">
+          <CardContent className="p-6 text-sm text-emerald-800 font-medium">
+            ✓ No skill gaps detected for {career.title}. Your assessed skills
+            meet or exceed all requirements.
+          </CardContent>
+        </Card>
+      )}
     </PageContainer>
   )
 }

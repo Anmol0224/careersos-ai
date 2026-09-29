@@ -1,18 +1,133 @@
-import React from 'react';
-import { PageContainer } from '../components/layout/PageContainer';
-import { RoadmapTimeline } from '../components/roadmap/RoadmapTimeline';
-import { mockRoadmapSteps } from '../data/mockData';
-import { Card, CardContent } from '../components/ui/Card';
-import { ProgressBar } from '../components/ui/ProgressBar';
-import { Button } from '../components/ui/Button';
-import { ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react'
+import { PageContainer } from '../components/layout/PageContainer'
+import { RoadmapTimeline } from '../components/roadmap/RoadmapTimeline'
+import { Card, CardContent } from '../components/ui/Card'
+import { ProgressBar } from '../components/ui/ProgressBar'
+import { Button } from '../components/ui/Button'
+import { ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import {
+  careerService,
+  type RoadmapData,
+} from '../services/careerService'
 
 export const Roadmap: React.FC = () => {
-  const navigate = useNavigate();
-  const completeSteps = mockRoadmapSteps.filter((s) => s.status === 'Complete').length;
-  const totalSteps = mockRoadmapSteps.length;
-  const completionPct = Math.round((completeSteps / totalSteps) * 100);
+  const navigate = useNavigate()
+  const { user } = useAuth()
+
+  const [roadmap, setRoadmap] = useState<RoadmapData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [completingStepId, setCompletingStepId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    async function load() {
+      if (!user) {
+        if (active) {
+          setRoadmap(null)
+          setLoading(false)
+        }
+        return
+      }
+
+      if (active) {
+        setLoading(true)
+        setError('')
+      }
+
+      try {
+        const data = await careerService.getOrCreateRoadmap(user.id)
+        if (active) setRoadmap(data)
+      } catch (err) {
+        if (active)
+          setError(
+            err instanceof Error ? err.message : 'Unable to load roadmap.',
+          )
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void load()
+
+    return () => {
+      active = false
+    }
+  }, [user])
+
+  const handleCompleteStep = useCallback(
+    async (stepId: string) => {
+      if (!user) return
+      setCompletingStepId(stepId)
+      try {
+        await careerService.completeStep(stepId)
+        // Optimistically update local state without full refetch
+        setRoadmap((prev) => {
+          if (!prev) return prev
+          const updatedSteps = prev.steps.map((s) =>
+            s.id === stepId ? { ...s, status: 'complete' as const } : s,
+          )
+          const completedCount = updatedSteps.filter(
+            (s) => s.status === 'complete',
+          ).length
+          return { ...prev, steps: updatedSteps, completedCount }
+        })
+      } catch (err) {
+        console.error('Failed to complete step:', err)
+      } finally {
+        setCompletingStepId(null)
+      }
+    },
+    [user],
+  )
+
+  if (loading) {
+    return (
+      <PageContainer
+        title="Your Roadmap"
+        subtitle="A simple plan built around your highest-priority gaps."
+        questionBadge="What should I do?"
+      >
+        <Card>
+          <CardContent className="p-6 text-sm text-[#475569]">
+            Loading your personalized roadmap...
+          </CardContent>
+        </Card>
+      </PageContainer>
+    )
+  }
+
+  if (error || !roadmap) {
+    return (
+      <PageContainer
+        title="Your Roadmap"
+        subtitle="A simple plan built around your highest-priority gaps."
+        questionBadge="What should I do?"
+      >
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6">
+            <p className="text-sm font-medium text-red-700">
+              {error || 'Roadmap data is unavailable.'}
+            </p>
+            <Button
+              className="mt-4"
+              variant="primary"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </PageContainer>
+    )
+  }
+
+  const { steps, completedCount, totalCount } = roadmap
+  const completionPct =
+    totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return (
     <PageContainer
@@ -36,13 +151,14 @@ export const Roadmap: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <span className="text-xs font-bold text-[#2563EB] uppercase tracking-wider block">
-                Target Role: Data Analyst
+                {roadmap.title}
               </span>
               <h3 className="text-xl font-bold text-[#0F172A]">
-                {completeSteps} / {totalSteps} steps complete
+                {completedCount} / {totalCount} steps complete
               </h3>
               <p className="text-xs text-[#475569]">
-                {completionPct}% overall progress toward certified full readiness.
+                {completionPct}% overall progress toward certified full
+                readiness.
               </p>
             </div>
 
@@ -74,9 +190,21 @@ export const Roadmap: React.FC = () => {
       </Card>
 
       {/* Timeline */}
-      <div className="pt-2">
-        <RoadmapTimeline steps={mockRoadmapSteps} />
-      </div>
+      {steps.length === 0 ? (
+        <Card>
+          <CardContent className="p-6 text-sm text-[#475569]">
+            Your roadmap is being prepared. Please check back shortly or start a challenge.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="pt-2">
+          <RoadmapTimeline
+            steps={steps}
+            onCompleteStep={handleCompleteStep}
+            completingStepId={completingStepId}
+          />
+        </div>
+      )}
     </PageContainer>
-  );
-};
+  )
+}
