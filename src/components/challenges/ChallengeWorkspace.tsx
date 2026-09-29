@@ -14,18 +14,23 @@ import {
 } from 'lucide-react';
 import type { ChallengeData } from '../../data/mockData';
 import { useNavigate } from 'react-router-dom';
-import { careerService } from '../../services/career';
+import { careerService } from '../../services/careerService';
+import { supabase } from '../../lib/supabase';
 
 export interface ChallengeWorkspaceProps {
   challenge: ChallengeData;
+  existingSubmission?: Record<string, unknown> | null;
 }
 
-export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challenge }) => {
+export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challenge, existingSubmission }) => {
   const navigate = useNavigate();
+  const isSubmitted = !!existingSubmission;
   const [responseText, setResponseText] = useState(
-    `1. APAC Regional Margin Compression: While APAC sales reached $1,250, profit was constrained to 32% due to freight and tier-2 vendor surcharges.\n2. Cloud ERP License Growth: Enterprise Analytics and Cloud ERP licenses account for 74% of total profit with a 47% net margin.\n3. Latin America Support Loss: Latin America support contracts show negative margins (-$120) due to unbudgeted SLA refunds.`
+    (existingSubmission?.text_response as string) || ''
   );
-  const [uploadedFile, setUploadedFile] = useState<string | null>('retail_sales_executive_dashboard.pbix');
+  const [uploadedFile, setUploadedFile] = useState<string | null>(
+    (existingSubmission?.file_name as string) || null
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,12 +38,18 @@ export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challeng
     if (!responseText.trim()) return;
 
     setIsSubmitting(true);
-    await careerService.submitChallenge(challenge.id, {
-      responseText,
-      fileName: uploadedFile || undefined,
-    });
-    setIsSubmitting(false);
-    navigate('/result');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      await careerService.submitChallenge(user.id, challenge.id, responseText, uploadedFile || undefined);
+      // Reload to show submitted state
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to submit:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -70,7 +81,7 @@ export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challeng
                 {challenge.title}
               </h2>
               <p className="text-sm text-slate-200 max-w-2xl">
-                Demonstrate real-world dashboarding proficiency to prove your Power BI competency to employers.
+                Demonstrate real-world proficiency in {challenge.skill} to prove your competency to employers.
               </p>
             </div>
           </div>
@@ -91,91 +102,111 @@ export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challeng
             </CardHeader>
             <CardContent className="space-y-4 pt-2">
               <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-xl text-sm text-[#0F172A] font-medium leading-relaxed">
-                "{challenge.mission}"
+                {challenge.mission}
               </div>
 
-              {/* Dataset Sample Preview */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#475569] uppercase tracking-wider flex items-center gap-1.5">
-                    <Table className="w-3.5 h-3.5 text-[#2563EB]" />
-                    Dataset Preview (sales_data_q1.csv)
-                  </span>
-                  <span className="text-xs text-[#2563EB] font-semibold cursor-pointer hover:underline">
-                    Download Raw CSV
-                  </span>
-                </div>
-                <div className="overflow-x-auto border border-[#E2E8F0] rounded-lg">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-50 text-[#475569] border-b border-[#E2E8F0]">
-                      <tr>
-                        <th className="py-2 px-3">Order ID</th>
-                        <th className="py-2 px-3">Product</th>
-                        <th className="py-2 px-3">Region</th>
-                        <th className="py-2 px-3 text-right">Sales</th>
-                        <th className="py-2 px-3 text-right">Profit</th>
-                        <th className="py-2 px-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E2E8F0] text-[#0F172A]">
-                      {challenge.datasetSample.map((row) => (
-                        <tr key={row.orderId} className="hover:bg-slate-50">
-                          <td className="py-2 px-3 font-mono font-medium">{row.orderId}</td>
-                          <td className="py-2 px-3">{row.product}</td>
-                          <td className="py-2 px-3">{row.region}</td>
-                          <td className="py-2 px-3 text-right font-medium">${row.sales.toLocaleString()}</td>
-                          <td className={`py-2 px-3 text-right font-medium ${row.profit < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                            ${row.profit.toLocaleString()}
-                          </td>
-                          <td className="py-2 px-3">
-                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-700">
-                              {row.status}
-                            </span>
-                          </td>
+              {/* Dataset Sample Preview — only show when challenge uses a tabular dataset */}
+              {challenge.datasetSample && challenge.datasetSample.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-[#475569] uppercase tracking-wider flex items-center gap-1.5">
+                      <Table className="w-3.5 h-3.5 text-[#2563EB]" />
+                      Sample Dataset
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto border border-[#E2E8F0] rounded-lg">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-[#475569] border-b border-[#E2E8F0]">
+                        <tr>
+                          <th className="py-2 px-3">Order ID</th>
+                          <th className="py-2 px-3">Product</th>
+                          <th className="py-2 px-3">Region</th>
+                          <th className="py-2 px-3 text-right">Sales</th>
+                          <th className="py-2 px-3 text-right">Profit</th>
+                          <th className="py-2 px-3">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-[#E2E8F0] text-[#0F172A]">
+                        {challenge.datasetSample.map((row) => (
+                          <tr key={row.orderId} className="hover:bg-slate-50">
+                            <td className="py-2 px-3 font-mono font-medium">{row.orderId}</td>
+                            <td className="py-2 px-3">{row.product}</td>
+                            <td className="py-2 px-3">{row.region}</td>
+                            <td className="py-2 px-3 text-right font-medium">${row.sales.toLocaleString()}</td>
+                            <td className={`py-2 px-3 text-right font-medium ${row.profit < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                              ${row.profit.toLocaleString()}
+                            </td>
+                            <td className="py-2 px-3">
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-700">
+                                {row.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Submission Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            <Card className="bg-white">
+            <Card className="bg-white relative overflow-hidden">
+              {isSubmitted && (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl">
+                  <div className="bg-white p-6 rounded-2xl shadow-xl border border-emerald-100 flex flex-col items-center text-center max-w-sm">
+                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                      <Check className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">Submitted Successfully</h3>
+                    <p className="text-sm text-slate-500 mb-6">
+                      Your proof submission has been recorded and is awaiting evaluation. Check back soon for your updated readiness score.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate('/roadmap')}
+                      className="w-full"
+                    >
+                      Return to Roadmap
+                    </Button>
+                  </div>
+                </div>
+              )}
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Your Proof Submission</CardTitle>
                 <p className="text-xs text-[#475569]">
-                  Input your extracted business insights and upload your dashboard file
+                  Input your response to the challenge mission
                 </p>
               </CardHeader>
               <CardContent className="space-y-5 pt-2">
                 {/* Text Response Area */}
                 <div>
                   <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">
-                    Executive Insights & Methodology (3 required)
+                    Your Response
                   </label>
                   <textarea
                     rows={6}
                     value={responseText}
                     onChange={(e) => setResponseText(e.target.value)}
                     required
-                    placeholder="1. Key finding regarding profit margins across regions...&#10;2. Product line concentration...&#10;3. Recommended business action..."
-                    className="w-full bg-slate-50 border border-[#E2E8F0] rounded-xl p-3.5 text-sm text-[#0F172A] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] leading-relaxed"
+                    disabled={isSubmitted}
+                    placeholder="Describe your approach, key decisions, and findings..."
+                    className="w-full bg-slate-50 border border-[#E2E8F0] rounded-xl p-3.5 text-sm text-[#0F172A] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] leading-relaxed disabled:opacity-75"
                   />
                 </div>
 
                 {/* Upload Area */}
                 <div>
                   <label className="block text-xs font-bold text-[#0F172A] uppercase tracking-wider mb-2">
-                    Dashboard File or Export (.pbix, .pdf, or screenshot)
+                    Supporting File (optional — .pdf, .py, .ipynb, .pbix, screenshot)
                   </label>
                   <div
-                    onClick={() => setUploadedFile('sales_analyst_dashboard_submission_v2.pbix')}
-                    className="border-2 border-dashed border-[#E2E8F0] hover:border-blue-400 rounded-xl p-6 text-center bg-slate-50/50 hover:bg-blue-50/20 transition-all cursor-pointer"
+                    onClick={() => !isSubmitted && setUploadedFile('sales_analyst_dashboard_submission_v2.pbix')}
+                    className={`border-2 border-dashed border-[#E2E8F0] rounded-xl p-6 text-center transition-all ${!isSubmitted ? 'hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 cursor-pointer' : 'bg-slate-50 opacity-75'}`}
                   >
-                    <UploadCloud className="w-8 h-8 mx-auto text-[#2563EB] mb-2" />
+                    <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${isSubmitted ? 'text-slate-400' : 'text-[#2563EB]'}`} />
                     <p className="text-sm font-semibold text-[#0F172A]">
                       {uploadedFile ? uploadedFile : 'Drag and drop your file here, or click to browse'}
                     </p>
@@ -192,20 +223,22 @@ export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challeng
                 </div>
 
                 {/* Submit button */}
-                <div className="pt-2 flex items-center justify-between">
-                  <span className="text-xs text-[#94A3B8]">
-                    Evaluates against 5 objective rubric criteria
-                  </span>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    isLoading={isSubmitting}
-                    leftIcon={<FileCheck className="w-4 h-4" />}
-                  >
-                    Submit Challenge
-                  </Button>
-                </div>
+                {!isSubmitted && (
+                  <div className="pt-2 flex items-center justify-between">
+                    <span className="text-xs text-[#94A3B8]">
+                      Evaluates against objective rubric criteria
+                    </span>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="lg"
+                      isLoading={isSubmitting}
+                      leftIcon={<FileCheck className="w-4 h-4" />}
+                    >
+                      Submit Challenge
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </form>

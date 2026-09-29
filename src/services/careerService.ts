@@ -478,6 +478,84 @@ export const careerService = {
     }
   },
 
+  async getChallengeForUser(userId: string): Promise<Record<string, unknown> | null> {
+    const careerGap = await this.getCareerGapData(userId)
+
+    // Sort all actionable skills by priority descending (highest importance / gap first)
+    // For all-unassessed case: sort by requiredScore desc for stability
+    const sortedGaps = [...careerGap.skills]
+      .filter((s) => s.status !== 'Ready')
+      .sort((a, b) => {
+        // Primary: priority (normalizedGap * importance)
+        const pdiff = b.priority - a.priority
+        if (Math.abs(pdiff) > 0.0001) return pdiff
+        // Tiebreak: requiredScore desc for determinism
+        return b.requiredScore - a.requiredScore
+      })
+
+    // Try each gap skill in priority order — return first challenge that matches
+    for (const gap of sortedGaps) {
+      const { data: gapChallenges } = await supabase
+        .from('challenges')
+        .select('*, skills(name)')
+        .eq('is_active', true)
+        .eq('skill_id', gap.id)
+        .order('difficulty', { ascending: true })
+        .limit(1)
+      if (gapChallenges && gapChallenges.length > 0) return gapChallenges[0]
+    }
+
+    // Fallback: any challenge in a skill required by this career
+    const allSkillIds = careerGap.skills.map((s) => s.id)
+    if (allSkillIds.length > 0) {
+      const { data: careerChallenges } = await supabase
+        .from('challenges')
+        .select('*, skills(name)')
+        .eq('is_active', true)
+        .in('skill_id', allSkillIds)
+        .limit(1)
+      if (careerChallenges && careerChallenges.length > 0) return careerChallenges[0]
+    }
+
+    // No challenge matched this career at all
+    return null
+  },
+
+  async submitChallenge(userId: string, challengeId: string, textResponse: string, fileName?: string): Promise<void> {
+    const { data: existing } = await supabase.from('challenge_submissions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('challenge_id', challengeId)
+      .maybeSingle()
+
+    if (existing) {
+       await supabase.from('challenge_submissions').update({
+         text_response: textResponse,
+         file_name: fileName,
+         status: 'submitted',
+         submitted_at: new Date().toISOString()
+       }).eq('id', existing.id)
+    } else {
+       await supabase.from('challenge_submissions').insert({
+         user_id: userId,
+         challenge_id: challengeId,
+         text_response: textResponse,
+         file_name: fileName,
+         status: 'submitted'
+       })
+    }
+  },
+
+  async getSubmission(userId: string, challengeId: string): Promise<Record<string, unknown> | null> {
+    const { data } = await supabase.from('challenge_submissions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('challenge_id', challengeId)
+      .maybeSingle()
+    return data
+  },
+
+
   /**
    * Marks a single roadmap step as complete.
    * Idempotent: calling it twice on the same step is safe.
