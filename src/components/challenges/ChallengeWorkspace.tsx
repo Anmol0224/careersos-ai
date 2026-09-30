@@ -25,6 +25,10 @@ export interface ChallengeWorkspaceProps {
 export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challenge, existingSubmission }) => {
   const navigate = useNavigate();
   const isSubmitted = !!existingSubmission;
+  const status = (existingSubmission?.status as string) || 'unsubmitted';
+  const evaluation = existingSubmission?.evaluation as Record<string, unknown> | undefined;
+  const aiScore = existingSubmission?.ai_score as number;
+
   const [responseText, setResponseText] = useState(
     (existingSubmission?.text_response as string) || ''
   );
@@ -49,6 +53,56 @@ export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challeng
       console.error('Failed to submit:', err);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const [isEvaluating, setIsEvaluating] = useState(status === 'evaluating');
+  const [evalError, setEvalError] = useState<string | null>(null);
+
+  const handleEvaluate = async () => {
+    if (!existingSubmission?.id) return;
+    setIsEvaluating(true);
+    setEvalError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const res = await fetch('/api/evaluate-challenge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          submissionId: existingSubmission.id,
+          challengeData: challenge
+        })
+      });
+
+      let responseText = '';
+      try {
+        responseText = await res.text();
+      } catch {
+        // ignore
+      }
+
+      let data: Record<string, unknown> | null = null;
+      try {
+        if (responseText) data = JSON.parse(responseText);
+      } catch {
+        // ignore
+      }
+
+      if (!res.ok || (data && data.success === false)) {
+        throw new Error((data?.error as string) || `Server error (${res.status})`);
+      }
+
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to evaluate:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Evaluation failed. Please try again.';
+      setEvalError(errorMessage);
+      setIsEvaluating(false);
     }
   };
 
@@ -155,23 +209,98 @@ export const ChallengeWorkspace: React.FC<ChallengeWorkspaceProps> = ({ challeng
           <form onSubmit={handleSubmit} className="space-y-6">
             <Card className="bg-white relative overflow-hidden">
               {isSubmitted && (
-                <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl">
-                  <div className="bg-white p-6 rounded-2xl shadow-xl border border-emerald-100 flex flex-col items-center text-center max-w-sm">
-                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
-                      <Check className="w-6 h-6" />
+                <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] z-10 flex flex-col p-6 overflow-y-auto">
+                  {status === 'evaluated' && evaluation ? (
+                    <div className="max-w-2xl mx-auto w-full space-y-6 pb-8">
+                      <div className="flex items-center justify-between border-b pb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
+                            <Check className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-slate-900">Evaluation Complete</h3>
+                            <p className="text-sm text-slate-500">Your submission has been reviewed.</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-3xl font-black text-blue-600">{aiScore}/100</div>
+                          <div className="text-xs font-bold uppercase text-slate-400">Overall Score</div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                          <h4 className="font-bold text-slate-800 mb-2">Summary</h4>
+                          <p className="text-sm text-slate-600 leading-relaxed">{String(evaluation.summary || '')}</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                            <h4 className="font-bold text-emerald-800 mb-2">Strengths</h4>
+                            <ul className="list-disc list-inside text-sm text-emerald-700 space-y-1">
+                              {Array.isArray(evaluation.strengths) && evaluation.strengths.map((s: unknown, i: number) => <li key={i}>{String(s)}</li>)}
+                            </ul>
+                          </div>
+                          <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                            <h4 className="font-bold text-amber-800 mb-2">Areas for Improvement</h4>
+                            <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
+                              {Array.isArray(evaluation.improvements) && evaluation.improvements.map((s: unknown, i: number) => <li key={i}>{String(s)}</li>)}
+                            </ul>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-slate-800 mb-3">Rubric Breakdown</h4>
+                          <div className="space-y-3">
+                            {Array.isArray(evaluation.criteria) && evaluation.criteria.map((c: Record<string, unknown>, i: number) => (
+                              <div key={i} className="bg-white p-3 border border-slate-200 rounded-lg flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="font-semibold text-sm text-slate-800">{String(c.name || '')}</div>
+                                  <div className="text-xs text-slate-500 mt-1">{String(c.feedback || '')}</div>
+                                </div>
+                                <div className="text-right sm:text-center min-w-[60px]">
+                                  <div className="font-bold text-slate-700">{Number(c.score || 0)}/100</div>
+                                  <div className="text-[10px] text-slate-400 font-medium uppercase">Score</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button variant="outline" onClick={() => navigate('/roadmap')} className="w-full">
+                        Return to Roadmap
+                      </Button>
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-2">Submitted Successfully</h3>
-                    <p className="text-sm text-slate-500 mb-6">
-                      Your proof submission has been recorded and is awaiting evaluation. Check back soon for your updated readiness score.
-                    </p>
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate('/roadmap')}
-                      className="w-full"
-                    >
-                      Return to Roadmap
-                    </Button>
-                  </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
+                      <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+                        {isEvaluating ? <Sparkles className="w-6 h-6 animate-pulse" /> : <FileCheck className="w-6 h-6" />}
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">
+                        {isEvaluating ? 'Evaluating Submission...' : 'Submission Received'}
+                      </h3>
+                      <p className="text-sm text-slate-500 mb-6">
+                        {isEvaluating
+                          ? 'CareerOS AI is currently reviewing your work against the rubric. This usually takes about 10 seconds.'
+                          : 'Your proof submission has been recorded. Run the AI evaluation to receive your score and feedback.'}
+                      </p>
+                      {evalError && (
+                        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3 mb-4 w-full">
+                          {evalError}
+                        </div>
+                      )}
+                      {!isEvaluating && status !== 'evaluated' && (
+                        <Button variant="primary" onClick={handleEvaluate} className="w-full mb-3" leftIcon={<Sparkles className="w-4 h-4"/>}>
+                          Evaluate with CareerOS AI
+                        </Button>
+                      )}
+                      
+                      <Button variant="outline" onClick={() => navigate('/roadmap')} className="w-full" disabled={isEvaluating}>
+                        Return to Roadmap
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
               <CardHeader className="pb-3">
