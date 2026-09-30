@@ -335,7 +335,7 @@ These are **not** implemented as product features today:
 
 ## Team
 
-| Name | |
+| Name | Viksit Bharat |
 | --- | --- |
 | Anmol | [github.com/Anmol0224](https://github.com/Anmol0224) |
 
